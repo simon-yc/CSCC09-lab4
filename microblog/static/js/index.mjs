@@ -6,21 +6,30 @@ import {
   downvoteMessage,
 } from "./api.mjs";
 
+function onError(err) {
+  console.error("[error]", err);
+  const error_box = document.querySelector("#error-box");
+  error_box.innerHTML = err;
+  error_box.style.visibility = "visible";
+}
+
 function updateVotes(message) {
-  document.querySelector("#msg" + message.id + " .upvote-icon").innerHTML =
+  document.querySelector("#msg" + message._id + " .upvote-icon").innerHTML =
     message.upvote;
-  document.querySelector("#msg" + message.id + " .downvote-icon").innerHTML =
+  document.querySelector("#msg" + message._id + " .downvote-icon").innerHTML =
     message.downvote;
 }
 
 function updateMessages() {
   document.querySelector("#messages").innerHTML = "";
-  const messages = getMessages();
-  messages.forEach(function (message) {
-    const elmt = document.createElement("div");
-    elmt.className = "row message align-items-center";
-    elmt.id = "msg" + message.id;
-    elmt.innerHTML = `
+  getMessages(function (err, messages) {
+    if (err) return onError(err);
+
+    messages.forEach(function (message) {
+      const elmt = document.createElement("div");
+      elmt.className = "row message align-items-center";
+      elmt.id = "msg" + message._id;
+      elmt.innerHTML = `
         <div class="col-1 message-user">
           <img
             class="message-picture"
@@ -36,19 +45,27 @@ function updateMessages() {
         <div class="col-1 downvote-icon icon">${message.downvote}</div>
         <div class="col-1 delete-icon icon"></div>
       `;
-    elmt.querySelector(".delete-icon").addEventListener("click", function () {
-      deleteMessage(message.id);
-      updateMessages();
+      elmt.querySelector(".delete-icon").addEventListener("click", function () {
+        deleteMessage(message._id, function (err) {
+          if (err) return onError(err);
+          updateMessages();
+        });
+      });
+      elmt.querySelector(".upvote-icon").addEventListener("click", function () {
+        upvoteMessage(message._id, function (err, updatedMessage) {
+          if (err) return onError(err);
+          updateVotes(updatedMessage); 
+        });
+      });
+      elmt.querySelector(".downvote-icon").addEventListener("click", function () {
+        downvoteMessage(message._id, function (err, updatedMessage) {
+          if (err) return onError(err);
+          updateVotes(updatedMessage); 
+        });
+      });
+      
+      document.querySelector("#messages").prepend(elmt);
     });
-    elmt.querySelector(".upvote-icon").addEventListener("click", function () {
-      upvoteMessage(message.id);
-      updateVotes(message);
-    });
-    elmt.querySelector(".downvote-icon").addEventListener("click", function () {
-      downvoteMessage(message.id);
-      updateVotes(message);
-    });
-    document.querySelector("#messages").prepend(elmt);
   });
 }
 
@@ -59,6 +76,14 @@ document
     const author = document.getElementById("post-username").value;
     const content = document.getElementById("post-content").value;
     document.getElementById("create-message-form").reset();
-    addMessage(author, content);
-    updateMessages();
+    addMessage(author, content, function (err) {
+      if (err) return onError(err);
+      updateMessages();
+    });
   });
+
+
+(function refresh() {
+  updateMessages();
+  setTimeout(refresh, 10000);
+})();
